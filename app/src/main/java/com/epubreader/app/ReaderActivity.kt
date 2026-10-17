@@ -1,6 +1,9 @@
 package com.epubreader.app
 
 import android.os.Bundle
+import kotlinx.coroutines.flow.collect
+import org.readium.r2.shared.publication.Locator
+import org.json.JSONObject
 import android.net.Uri
 import android.view.View
 import android.widget.FrameLayout
@@ -134,9 +137,27 @@ class ReaderActivity : FragmentActivity() {
 
                 val navigatorFactory = EpubNavigatorFactory(publication)
 
+                val progressPreferences = getSharedPreferences(
+                    "reading_progress",
+                    MODE_PRIVATE
+                )
+
+                val savedPosition = progressPreferences.getString(
+                    uriString,
+                    null
+                )
+
+                val initialLocator = try {
+                    savedPosition?.let {
+                        Locator.fromJSON(JSONObject(it))
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+
                 supportFragmentManager.fragmentFactory =
                     navigatorFactory.createFragmentFactory(
-                        initialLocator = null
+                        initialLocator = initialLocator
                     )
 
                 container.removeAllViews()
@@ -145,9 +166,25 @@ class ReaderActivity : FragmentActivity() {
                     .replace(
                         containerId,
                         EpubNavigatorFragment::class.java,
-                        Bundle()
+                        Bundle(),
+                        "epub_navigator"
                     )
-                    .commit()
+                    .commitNow()
+
+                val navigator = supportFragmentManager
+                    .findFragmentByTag("epub_navigator")
+                    as EpubNavigatorFragment
+
+                lifecycleScope.launch {
+                    navigator.currentLocator.collect { locator ->
+                        progressPreferences.edit()
+                            .putString(
+                                uriString,
+                                locator.toJSON().toString()
+                            )
+                            .apply()
+                    }
+                }
 
             } catch (e: Exception) {
                 showError(
