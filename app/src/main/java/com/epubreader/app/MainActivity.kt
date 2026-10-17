@@ -4,7 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
-import android.view.Gravity
+import android.provider.OpenableColumns
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -40,13 +40,12 @@ class MainActivity : Activity() {
         }
 
         val importButton = Button(this).apply {
-            text = "＋  Importar libro EPUB"
+            text = "＋ Importar libro EPUB"
             setOnClickListener { selectBook() }
         }
 
         library = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 24, 0, 0)
         }
 
         val scroll = ScrollView(this).apply {
@@ -73,10 +72,10 @@ class MainActivity : Activity() {
         library.removeAllViews()
 
         val empty = TextView(this).apply {
-            text = "Todavía no tienes libros.\n\nImporta un archivo EPUB para añadirlo a tu biblioteca."
+            text = "Todavía no tienes libros.\\n\\nImporta un archivo EPUB para añadirlo a tu biblioteca."
             textSize = 16f
             setTextColor(0xFFBBBBBB.toInt())
-            setPadding(0, 16, 0, 16)
+            setPadding(0, 24, 0, 16)
         }
 
         library.addView(empty)
@@ -90,7 +89,8 @@ class MainActivity : Activity() {
                 Intent.EXTRA_MIME_TYPES,
                 arrayOf(
                     "application/epub+zip",
-                    "application/octet-stream"
+                    "application/octet-stream",
+                    "application/zip"
                 )
             )
         }
@@ -109,14 +109,12 @@ class MainActivity : Activity() {
         if (requestCode != 100 || resultCode != RESULT_OK) return
 
         val uri = data?.data ?: return
-        val name = uri.lastPathSegment
-            ?.substringAfterLast('/')
-            ?: "Libro EPUB"
+        val name = getFileName(uri) ?: "Libro EPUB"
 
-        if (!name.lowercase().endsWith(".epub")) {
+        if (!name.trim().lowercase().endsWith(".epub")) {
             Toast.makeText(
                 this,
-                "Selecciona un archivo con extensión .epub",
+                "El archivo seleccionado no parece ser EPUB: $name",
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -126,10 +124,31 @@ class MainActivity : Activity() {
         showBooks()
     }
 
+    private fun getFileName(uri: Uri): String? {
+        if (uri.scheme == "content") {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(
+                        OpenableColumns.DISPLAY_NAME
+                    )
+                    if (index >= 0) return cursor.getString(index)
+                }
+            }
+        }
+
+        return uri.lastPathSegment?.substringAfterLast('/')
+    }
+
     private fun showBooks() {
         library.removeAllViews()
 
-        for (name in books.keys) {
+        for ((name, uri) in books) {
             val book = TextView(this).apply {
                 text = "📖  $name"
                 textSize = 17f
