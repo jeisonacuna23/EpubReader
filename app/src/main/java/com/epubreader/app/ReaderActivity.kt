@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 import org.readium.r2.shared.util.toAbsoluteUrl
+import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.streamer.PublicationOpener
@@ -112,7 +113,8 @@ class ReaderActivity : FragmentActivity() {
                 val parser = DefaultPublicationParser(
                     this@ReaderActivity,
                     httpClient = httpClient,
-                    assetRetriever = assetRetriever
+                    assetRetriever = assetRetriever,
+                    pdfFactory = null
                 )
 
                 val opener = PublicationOpener(
