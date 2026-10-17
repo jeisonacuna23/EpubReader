@@ -17,6 +17,10 @@ class MainActivity : Activity() {
     private lateinit var library: LinearLayout
     private val books = linkedMapOf<String, Uri>()
 
+    private val preferences by lazy {
+        getSharedPreferences("epub_library", MODE_PRIVATE)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -65,20 +69,9 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
-        showEmptyLibrary()
-    }
 
-    private fun showEmptyLibrary() {
-        library.removeAllViews()
-
-        val empty = TextView(this).apply {
-            text = "Todavía no tienes libros.\\n\\nImporta un archivo EPUB para añadirlo a tu biblioteca."
-            textSize = 16f
-            setTextColor(0xFFBBBBBB.toInt())
-            setPadding(0, 24, 0, 16)
-        }
-
-        library.addView(empty)
+        loadBooks()
+        showBooks()
     }
 
     private fun selectBook() {
@@ -93,6 +86,8 @@ class MainActivity : Activity() {
                     "application/zip"
                 )
             )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
 
         startActivityForResult(intent, 100)
@@ -114,14 +109,37 @@ class MainActivity : Activity() {
         if (!name.trim().lowercase().endsWith(".epub")) {
             Toast.makeText(
                 this,
-                "El archivo seleccionado no parece ser EPUB: $name",
+                "Selecciona un archivo con extensión .epub",
                 Toast.LENGTH_LONG
             ).show()
             return
         }
 
-        books[name] = uri
-        showBooks()
+        try {
+            val permissionFlags = data.flags and
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+
+            contentResolver.takePersistableUriPermission(
+                uri,
+                permissionFlags
+            )
+
+            books[name] = uri
+            saveBooks()
+            showBooks()
+
+            Toast.makeText(
+                this,
+                "Libro guardado en la biblioteca",
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "No se pudo guardar el acceso al libro: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun getFileName(uri: Uri): String? {
@@ -145,10 +163,49 @@ class MainActivity : Activity() {
         return uri.lastPathSegment?.substringAfterLast('/')
     }
 
+    private fun saveBooks() {
+        val editor = preferences.edit().clear()
+        editor.putInt("book_count", books.size)
+
+        books.entries.forEachIndexed { index, entry ->
+            editor.putString("name_$index", entry.key)
+            editor.putString("uri_$index", entry.value.toString())
+        }
+
+        editor.apply()
+    }
+
+    private fun loadBooks() {
+        books.clear()
+
+        val count = preferences.getInt("book_count", 0)
+
+        for (index in 0 until count) {
+            val name = preferences.getString("name_$index", null)
+            val uriString = preferences.getString("uri_$index", null)
+
+            if (name != null && uriString != null) {
+                books[name] = Uri.parse(uriString)
+            }
+        }
+    }
+
     private fun showBooks() {
         library.removeAllViews()
 
-        for ((name, uri) in books) {
+        if (books.isEmpty()) {
+            val empty = TextView(this).apply {
+                text = "Todavía no tienes libros.\n\nImporta un archivo EPUB para añadirlo a tu biblioteca."
+                textSize = 16f
+                setTextColor(0xFFBBBBBB.toInt())
+                setPadding(0, 24, 0, 16)
+            }
+
+            library.addView(empty)
+            return
+        }
+
+        for (name in books.keys) {
             val book = TextView(this).apply {
                 text = "📖  $name"
                 textSize = 17f
@@ -161,6 +218,7 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+
             params.bottomMargin = 12
             library.addView(book, params)
         }
