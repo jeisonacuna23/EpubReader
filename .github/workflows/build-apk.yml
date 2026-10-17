@@ -49,12 +49,14 @@ jobs:
             -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/muro-key.jks" >> "$GITHUB_ENV"
 
+      - name: Calcular versionCode
+        run: echo "ANDROID_VERSION_CODE=$((10000 + $GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       - name: Compilar APK firmada
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_VERSION_CODE: ${{ 10000 + github.run_number }}
         run: gradle assembleRelease
 
       - name: Guardar APK
