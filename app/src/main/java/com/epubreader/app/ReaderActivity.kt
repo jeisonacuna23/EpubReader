@@ -90,7 +90,7 @@ class ReaderActivity : FragmentActivity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.END
             ).apply {
-                topMargin = buttonSize
+                topMargin = buttonSize + (48 * resources.displayMetrics.density).toInt()
                 marginEnd = buttonSize
             }
         )
