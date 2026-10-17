@@ -1,6 +1,10 @@
 package com.epubreader.app
 
 import android.os.Bundle
+import android.app.AlertDialog
+import android.content.SharedPreferences
+import android.view.Gravity
+import android.widget.Button
 import kotlinx.coroutines.flow.collect
 import org.readium.r2.shared.publication.Locator
 import org.json.JSONObject
@@ -24,7 +28,12 @@ import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.Theme
+import org.readium.r2.shared.ExperimentalReadiumApi
 
+@OptIn(ExperimentalReadiumApi::class)
 class ReaderActivity : FragmentActivity() {
 
     private val containerId = View.generateViewId()
@@ -41,10 +50,50 @@ class ReaderActivity : FragmentActivity() {
         super.onCreate(null)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
+        val root = FrameLayout(this)
+
         val container = FrameLayout(this).apply {
             id = containerId
             setBackgroundColor(Color.WHITE)
         }
+
+        root.addView(
+            container,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        val readerPreferences = getSharedPreferences(
+            "reader_preferences",
+            MODE_PRIVATE
+        )
+        var activeNavigator: EpubNavigatorFragment? = null
+
+        val settingsButton = Button(this).apply {
+            text = "Aa"
+            textSize = 16f
+            contentDescription = "Ajustes de lectura"
+            setOnClickListener {
+                activeNavigator?.let {
+                    showReaderSettings(it, readerPreferences)
+                }
+            }
+        }
+
+        val buttonSize = (8 * resources.displayMetrics.density).toInt()
+        root.addView(
+            settingsButton,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END
+            ).apply {
+                topMargin = buttonSize
+                marginEnd = buttonSize
+            }
+        )
 
         val status = TextView(this).apply {
             text = "Abriendo libro…"
@@ -83,7 +132,7 @@ class ReaderActivity : FragmentActivity() {
             )
         )
 
-        setContentView(container)
+        setContentView(root)
 
         val uriString = intent.getStringExtra("book_uri")
         if (uriString.isNullOrBlank()) {
@@ -159,7 +208,8 @@ class ReaderActivity : FragmentActivity() {
 
                 supportFragmentManager.fragmentFactory =
                     navigatorFactory.createFragmentFactory(
-                        initialLocator = initialLocator
+                        initialLocator = initialLocator,
+                        initialPreferences = loadReaderPreferences(readerPreferences)
                     )
 
                 container.removeAllViews()
@@ -176,6 +226,8 @@ class ReaderActivity : FragmentActivity() {
                 val navigator = supportFragmentManager
                     .findFragmentByTag("epub_navigator")
                     as EpubNavigatorFragment
+
+                activeNavigator = navigator
 
                 lifecycleScope.launch {
                     navigator.currentLocator.collect { locator ->
@@ -195,6 +247,68 @@ class ReaderActivity : FragmentActivity() {
                 )
             }
         }
+    }
+
+    private fun showReaderSettings(
+        navigator: EpubNavigatorFragment,
+        preferences: SharedPreferences
+    ) {
+        val options = arrayOf(
+            "Tema: Claro",
+            "Tema: Oscuro",
+            "Tema: Sepia",
+            "Tamaño de letra: 90%",
+            "Tamaño de letra: 100%",
+            "Tamaño de letra: 110%",
+            "Tamaño de letra: 120%",
+            "Tamaño de letra: 130%",
+            "Tamaño de letra: 140%"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Ajustes de lectura")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> preferences.edit().putString("theme", "light").apply()
+                    1 -> preferences.edit().putString("theme", "dark").apply()
+                    2 -> preferences.edit().putString("theme", "sepia").apply()
+                    else -> {
+                        val sizes = mapOf(
+                            3 to 0.9f,
+                            4 to 1.0f,
+                            5 to 1.1f,
+                            6 to 1.2f,
+                            7 to 1.3f,
+                            8 to 1.4f
+                        )
+                        sizes[which]?.let { size ->
+                            preferences.edit().putFloat("font_size", size).apply()
+                        }
+                    }
+                }
+
+                navigator.submitPreferences(loadReaderPreferences(preferences))
+            }
+            .show()
+    }
+
+    private fun loadReaderPreferences(
+        preferences: SharedPreferences
+    ): EpubPreferences {
+        val theme = when (preferences.getString("theme", "light")) {
+            "dark" -> Theme.DARK
+            "sepia" -> Theme.SEPIA
+            else -> Theme.LIGHT
+        }
+
+        val fontSize = preferences.getFloat("font_size", 1.0f).toDouble()
+
+        return EpubPreferences(
+            theme = theme,
+            fontSize = fontSize,
+            fontFamily = FontFamily.SERIF,
+            publisherStyles = false
+        )
     }
 
     private fun showError(container: FrameLayout, message: String) {
