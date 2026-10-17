@@ -32,12 +32,33 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Compilar APK
-        run: gradle assembleDebug
+      - name: Preparar clave de firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -eu
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/muro-key.jks"
+          keytool -list -keystore "$RUNNER_TEMP/muro-key.jks" \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/muro-key.jks" >> "$GITHUB_ENV"
+
+      - name: Compilar APK firmada
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle assembleRelease
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
-          name: EpubReader-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: EpubReader-release
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

@@ -1,0 +1,16 @@
+# Claves privadas y contraseñas
+*.jks
+*.keystore
+key.properties
+keystore/
+.android-signing/
+
+# Archivos de compilación
+.gradle/
+build/
+app/build/
+local.properties
+
+# Configuración local
+.idea/
+*.iml
