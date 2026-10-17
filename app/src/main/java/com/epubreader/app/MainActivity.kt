@@ -212,6 +212,16 @@ class MainActivity : Activity() {
                 setTextColor(0xFFFFFFFF.toInt())
                 setPadding(16, 20, 16, 20)
                 setBackgroundColor(0xFF242424.toInt())
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    val uri = books[name]
+                    if (uri != null) {
+                        val intent = Intent(this@MainActivity, ReaderActivity::class.java)
+                        intent.putExtra("book_uri", uri.toString())
+                        startActivity(intent)
+                    }
+                }
             }
 
             val params = LinearLayout.LayoutParams(
