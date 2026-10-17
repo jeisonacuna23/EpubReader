@@ -12,6 +12,7 @@ import android.widget.ProgressBar
 import android.widget.LinearLayout
 import android.graphics.Color
 import androidx.fragment.app.FragmentActivity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,7 @@ class ReaderActivity : FragmentActivity() {
         }
 
         super.onCreate(null)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         val container = FrameLayout(this).apply {
             id = containerId
